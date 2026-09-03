@@ -8,7 +8,7 @@ import {
   pushCeil,
   type DestScope,
 } from "@/lib/catalog";
-import { DEFAULT_SETTINGS, useUserSettings } from "@/lib/settings";
+import { DEFAULT_SETTINGS, useUserSettings, type UserSettings } from "@/lib/settings";
 import { DealCard } from "@/components/DealCard";
 import { DealDetailSheet } from "@/components/DealDetailSheet";
 import { SettingsSheet } from "@/components/SettingsSheet";
@@ -30,7 +30,23 @@ type SortKey = "price" | "time" | "duration";
 const SCOPE_LABEL: Record<DestScope, string> = {
   domestic: "国内",
   international: "东南亚",
+  japan: "日本",
+  europe: "欧洲",
 };
+
+/** 根据当前选中的 scope 获取对应配置的阈值 */
+function getThresholdForScope(sc: DestScope, s: UserSettings): number {
+  switch (sc) {
+    case "international":
+      return s.sea_threshold;
+    case "japan":
+      return s.japan_threshold ?? 1500;
+    case "europe":
+      return s.europe_threshold ?? 3800;
+    default:
+      return s.threshold;
+  }
+}
 
 export function HomeClient() {
   const { settings, setSettings, ready } = useUserSettings(DEFAULT_SETTINGS);
@@ -49,8 +65,10 @@ export function HomeClient() {
   const router = useRouter();
 
   /** 当前 scope 使用的阈值 */
-  const currentThreshold =
-    scope === "international" ? settings.sea_threshold : settings.threshold;
+  const currentThreshold = useMemo(
+    () => getThresholdForScope(scope, settings),
+    [scope, settings]
+  );
 
   // 拉取未读告警数（首页红点徽章）
   useEffect(() => {
@@ -110,7 +128,9 @@ export function HomeClient() {
   );
 
   useEffect(() => {
-    if (ready) runScan({ from_code: settings.from_code, threshold: currentThreshold }, scope);
+    if (ready) {
+      runScan({ from_code: settings.from_code, threshold: currentThreshold }, scope);
+    }
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [ready]);
 
@@ -118,7 +138,7 @@ export function HomeClient() {
   const onScopeChange = (sc: DestScope) => {
     if (sc === scope) return;
     setScope(sc);
-    const t = sc === "international" ? settings.sea_threshold : settings.threshold;
+    const t = getThresholdForScope(sc, settings);
     runScan({ from_code: settings.from_code, threshold: t }, sc);
   };
 
@@ -211,7 +231,7 @@ export function HomeClient() {
         >
           <div className="flex items-center gap-2 pr-4">
             <span className="text-2xs text-gray-600">出发</span>
-            <span className="text-sm font-semibold text-gray-900">{origin?.name ?? "深圳"}</span>
+            <span className="text-sm font-semibold text-gray-900">{origin?.name ?? "上海"}</span>
           </div>
           <div className="flex items-center gap-2 px-4 flex-1">
             <span className="text-2xs text-gray-600">监控</span>
@@ -226,9 +246,9 @@ export function HomeClient() {
 
       {/* 工具条：scope 切换 + 刷新 + 排序 */}
       <div className="px-5 py-2.5 flex items-center gap-2 border-b border-gray-100 sticky top-0 bg-white/95 backdrop-blur z-20">
-        {/* 国内 / 东南亚 Tab */}
+        {/* 国内 / 东南亚 / 日本 / 欧洲 Tab */}
         <div className="flex items-center gap-0.5 bg-gray-100 rounded-md p-0.5">
-          {(["domestic", "international"] as const).map((sc) => (
+          {(["domestic", "international", "japan", "europe"] as const).map((sc) => (
             <button
               key={sc}
               onClick={() => onScopeChange(sc)}
@@ -294,7 +314,7 @@ export function HomeClient() {
           <InternationalEmptyHint
             scope={scope}
             fromCode={settings.from_code}
-            originName={origin?.name ?? "深圳"}
+            originName={origin?.name ?? "上海"}
             ceil={ceil}
             onPickOrigin={(code) => {
               const next = { ...settings, from_code: code };
@@ -333,7 +353,7 @@ export function HomeClient() {
       <footer className="mt-4 px-5 py-6 border-t border-gray-100">
         <p className="text-center text-2xs text-gray-500 leading-relaxed">
           价格含机建燃油，为参考价；以下单时实时验价为准。<br />
-          数据由龙虾出行开放平台提供，国内 / 东南亚均支持北上广深出发。
+          数据由龙虾出行开放平台提供，国内 / 东南亚 / 日本 / 欧洲均支持江浙沪多地出发。
         </p>
       </footer>
 
@@ -344,7 +364,7 @@ export function HomeClient() {
         scope={scope}
         onSave={(s) => {
           setSettings(s);
-          const t = scope === "international" ? s.sea_threshold : s.threshold;
+          const t = getThresholdForScope(scope, s);
           runScan({ from_code: s.from_code, threshold: t }, scope);
         }}
       />
@@ -354,9 +374,8 @@ export function HomeClient() {
 }
 
 /**
- * 空态：国际（东南亚）数据当前上游覆盖有限——
- * 深圳出发几乎无东南亚模拟数据，广州出发已有部分航线（如胡志明）。
- * 这里给诚实提示，并允许一键切换到有数据的出发地。
+ * 空态提示：
+ * 当周边城市国际航线不足时，给予切换到上海主枢纽的引导。
  */
 function InternationalEmptyHint({
   scope,
@@ -372,8 +391,8 @@ function InternationalEmptyHint({
   onPickOrigin: (code: string) => void;
 }) {
   const label = SCOPE_LABEL[scope];
-  // 国际 + 深圳出发：上游该象限基本无数据，给出换出发地引导
-  const seaFromSZ = scope === "international" && fromCode === "SZX";
+  // 国际航线（东南亚/日本/欧洲）且非上海出发时，建议切换到上海出发
+  const isRegionalInternational = scope !== "domestic" && fromCode !== "SHA";
 
   return (
     <div className="fade-in text-center py-16 px-6">
@@ -385,16 +404,16 @@ function InternationalEmptyHint({
       <div className="text-sm font-semibold text-gray-900">
         暂无低于 ¥{ceil} 的{label}机票
       </div>
-      {seaFromSZ ? (
+      {isRegionalInternational ? (
         <div className="mt-1.5 text-xs text-gray-600 leading-relaxed max-w-[280px] mx-auto">
-          从<strong>{originName}</strong>出发的{label}航线数据暂时较少。
+          从<strong>{originName}</strong>直飞{label}的航班较少。
           <button
-            onClick={() => onPickOrigin("CAN")}
+            onClick={() => onPickOrigin("SHA")}
             className="btn-press ml-1 text-gray-900 font-semibold underline underline-offset-2 decoration-gray-400 hover:decoration-gray-900"
           >
-            试试广州出发
+            试试上海出发
           </button>
-          ，或调高监控金额 / 过几天再来。
+          ，或调高监控金额。
         </div>
       ) : (
         <div className="mt-1.5 text-xs text-gray-600 leading-relaxed max-w-[280px] mx-auto">
