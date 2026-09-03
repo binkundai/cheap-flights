@@ -6,22 +6,28 @@ import {
   ORIGIN_CITIES,
   DOMESTIC_DESTINATIONS,
   SEA_DESTINATIONS,
+  JAPAN_DESTINATIONS,
+  EUROPE_DESTINATIONS,
   DEFAULT_THRESHOLD,
-  DEFAULT_SEA_THRESHOLD,
+  DEFAULT_ORIGIN_CODE,
   scopeOf,
+  defaultThresholdOf,
   pushCeil,
   type DestScope,
 } from "@/lib/catalog";
 
-/** 按 scope 区分的阈值预设档（元） */
 const THRESHOLD_PRESETS: Record<DestScope, number[]> = {
   domestic: [300, 500, 800, 1000, 1500],
   international: [800, 1200, 2000, 3000, 4000],
+  japan: [1000, 1500, 2000, 2500, 3500],
+  europe: [2500, 3500, 4500, 6000, 8000],
 };
 
 const SCOPE_LABEL: Record<DestScope, string> = {
   domestic: "国内热门",
   international: "东南亚",
+  japan: "日本",
+  europe: "欧洲",
 };
 
 export interface SubscriptionDraft {
@@ -57,7 +63,7 @@ export function SubscriptionSheet({
   defaultFromCode?: string;
 }) {
   const today = todayStr();
-  const [fromCode, setFromCode] = useState(defaultFromCode ?? "SZX");
+  const [fromCode, setFromCode] = useState(defaultFromCode ?? DEFAULT_ORIGIN_CODE);
   const [toCode, setToCode] = useState("");
   const [dateStart, setDateStart] = useState(today);
   const [dateEnd, setDateEnd] = useState(plusDaysStr(today, 14));
@@ -70,7 +76,7 @@ export function SubscriptionSheet({
   if (open !== lastOpen) {
     setLastOpen(open);
     if (open) {
-      setFromCode(defaultFromCode ?? "SZX");
+      setFromCode(defaultFromCode ?? DEFAULT_ORIGIN_CODE);
       setToCode("");
       setDateStart(today);
       setDateEnd(plusDaysStr(today, 14));
@@ -93,17 +99,17 @@ export function SubscriptionSheet({
   const presets = THRESHOLD_PRESETS[toScope];
 
   /** 选择目的地：切换时若阈值仍为另一 scope 的默认值，则同步切到当前 scope 默认值 */
-  const pickTo = (code: string) => {
-    const next = code === toCode ? "" : code;
-    setToCode(next);
-    if (next) {
-      const sc = scopeOf(next);
-      const stillDefault =
-        (sc === "domestic" && threshold === DEFAULT_SEA_THRESHOLD) ||
-        (sc === "international" && threshold === DEFAULT_THRESHOLD);
-      if (stillDefault) setThreshold(sc === "international" ? DEFAULT_SEA_THRESHOLD : DEFAULT_THRESHOLD);
-    }
-  };
+const pickTo = (code: string) => {
+  const next = code === toCode ? "" : code;
+  setToCode(next);
+  if (next) {
+    const sc = scopeOf(next);
+    const prevScope = toCode ? scopeOf(toCode) : "domestic";
+    // 若阈值仍停留在切换前那个 scope 的默认值，则同步切到新 scope 的默认值
+    const stillDefault = threshold === defaultThresholdOf(prevScope);
+    if (stillDefault) setThreshold(defaultThresholdOf(sc));
+  }
+};
 
   const submit = async () => {
     if (!canSubmit) return;
@@ -157,8 +163,10 @@ export function SubscriptionSheet({
           <p className="mt-1 text-2xs text-gray-600">选择一个想去的城市</p>
           <div className="mt-3 max-h-64 overflow-y-auto no-scrollbar space-y-3">
             {([
-              { scope: "domestic" as const, list: DOMESTIC_DESTINATIONS },
-              { scope: "international" as const, list: SEA_DESTINATIONS },
+  { scope: "domestic" as const, list: DOMESTIC_DESTINATIONS },
+  { scope: "international" as const, list: SEA_DESTINATIONS },
+  { scope: "japan" as const, list: JAPAN_DESTINATIONS },
+  { scope: "europe" as const, list: EUROPE_DESTINATIONS },
             ]).map(({ scope: sc, list }) => (
               <div key={sc}>
                 <div className="text-2xs font-semibold text-gray-500 mb-1.5 px-0.5">
