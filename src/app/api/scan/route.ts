@@ -2,6 +2,8 @@ import { NextRequest, NextResponse } from "next/server";
 import {
   DOMESTIC_DESTINATIONS,
   SEA_DESTINATIONS,
+  JAPAN_DESTINATIONS,
+  EUROPE_DESTINATIONS,
   ORIGIN_MAP,
   DEFAULT_THRESHOLD,
   DEFAULT_ORIGIN_CODE,
@@ -20,7 +22,7 @@ interface ScanBody {
   threshold?: number;
   dates?: string[]; // YYYY-MM-DD[]
   destinations?: string[]; // 可选：自定义目的地 code 列表
-  /** 国内 / 东南亚（国际），默认 domestic */
+  /** 国内 / 东南亚 / 日本 / 欧洲，默认 domestic */
   scope?: DestScope;
 }
 
@@ -42,14 +44,22 @@ export async function POST(req: NextRequest) {
   const from_code = body.from_code || DEFAULT_ORIGIN_CODE;
   if (!ORIGIN_MAP[from_code]) {
     return NextResponse.json(
-      { ok: false, error: "仅支持北上广深出发（SZX/CAN/PEK/SHA）" },
+      { ok: false, error: "仅支持上海及江浙沪出发（SHA/HGH/WUX/CZX/NTG）" },
       { status: 400 }
     );
   }
 
-  // scope: domestic | international，scope 与上游 trip_mode 同值
-  const scope: DestScope = body.scope === "international" ? "international" : "domestic";
-  const pool = scope === "international" ? SEA_DESTINATIONS : DOMESTIC_DESTINATIONS;
+  // scope: domestic | international | japan | europe，默认 domestic
+  const scope: DestScope =
+    body.scope === "international" || body.scope === "japan" || body.scope === "europe"
+      ? body.scope
+      : "domestic";
+
+  // 根据 scope 选择对应的目的地池
+  let pool = DOMESTIC_DESTINATIONS;
+  if (scope === "international") pool = SEA_DESTINATIONS;
+  else if (scope === "japan") pool = JAPAN_DESTINATIONS;
+  else if (scope === "europe") pool = EUROPE_DESTINATIONS;
 
   const threshold = clampThreshold(body.threshold);
 
@@ -58,17 +68,21 @@ export async function POST(req: NextRequest) {
       ? body.dates.slice(0, 21)
       : nextDays(DEFAULT_DAYS);
 
-  const dests = (Array.isArray(body.destinations) && body.destinations.length
-    ? pool.filter((d) => body.destinations!.includes(d.code))
-    : pool
+  const dests = (
+    Array.isArray(body.destinations) && body.destinations.length
+      ? pool.filter((d) => body.destinations!.includes(d.code))
+      : pool
   ).filter((d) => d.code !== from_code);
+
+  // 国际航线（东南亚/日本/欧洲）上游 trip_mode 统一传 "international"
+  const tripMode = scope === "domestic" ? "domestic" : "international";
 
   const result = await scanLowestDeals(
     from_code,
     dests.map((d) => d.code),
     dates,
     threshold,
-    { limit: 60, trip_mode: scope }
+    { limit: 60, trip_mode: tripMode }
   );
 
   return NextResponse.json({
