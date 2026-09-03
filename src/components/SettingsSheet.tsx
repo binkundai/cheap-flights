@@ -8,11 +8,15 @@ import type { UserSettings } from "@/lib/settings";
 const THRESHOLD_PRESETS: Record<DestScope, number[]> = {
   domestic: [300, 500, 800, 1000, 1500],
   international: [800, 1200, 2000, 3000, 4000],
+  japan: [1000, 1500, 2000, 2500, 3500],
+  europe: [2500, 3500, 4500, 6000, 8000],
 };
 
 const SCOPE_LABEL: Record<DestScope, string> = {
   domestic: "国内",
   international: "东南亚",
+  japan: "日本",
+  europe: "欧洲",
 };
 
 export function SettingsSheet({
@@ -32,7 +36,10 @@ export function SettingsSheet({
   const [fromCode, setFromCode] = useState(settings.from_code);
   const [threshold, setThreshold] = useState(settings.threshold);
   const [seaThreshold, setSeaThreshold] = useState(settings.sea_threshold);
-  /** Sheet 内切换编辑国内 / 东南亚阈值，默认聚焦当前 scope */
+  const [japanThreshold, setJapanThreshold] = useState(settings.japan_threshold ?? 1500);
+  const [europeThreshold, setEuropeThreshold] = useState(settings.europe_threshold ?? 3800);
+
+  /** Sheet 内切换编辑国内 / 东南亚 / 日本 / 欧洲 阈值，默认聚焦当前 scope */
   const [editScope, setEditScope] = useState<DestScope>(scope);
 
   const [lastOpen, setLastOpen] = useState(false);
@@ -42,16 +49,46 @@ export function SettingsSheet({
       setFromCode(settings.from_code);
       setThreshold(settings.threshold);
       setSeaThreshold(settings.sea_threshold);
+      setJapanThreshold(settings.japan_threshold ?? 1500);
+      setEuropeThreshold(settings.europe_threshold ?? 3800);
       setEditScope(scope);
     }
   }
 
   // 当前编辑的 scope 对应的值 / setter
-  const isSea = editScope === "international";
-  const editingValue = isSea ? seaThreshold : threshold;
-  const setEditingValue = isSea ? setSeaThreshold : setThreshold;
+  const getEditingValue = () => {
+    switch (editScope) {
+      case "international":
+        return seaThreshold;
+      case "japan":
+        return japanThreshold;
+      case "europe":
+        return europeThreshold;
+      default:
+        return threshold;
+    }
+  };
+
+  const setEditingValue = (val: number) => {
+    switch (editScope) {
+      case "international":
+        setSeaThreshold(val);
+        break;
+      case "japan":
+        setJapanThreshold(val);
+        break;
+      case "europe":
+        setEuropeThreshold(val);
+        break;
+      default:
+        setThreshold(val);
+        break;
+    }
+  };
+
+  const editingValue = getEditingValue();
   const ceil = Math.round(editingValue * 1.1);
-  const presets = THRESHOLD_PRESETS[editScope];
+  const presets = THRESHOLD_PRESETS[editScope] || THRESHOLD_PRESETS.domestic;
 
   return (
     <>
@@ -81,15 +118,15 @@ export function SettingsSheet({
               {/* 出发城市 */}
               <section>
                 <label className="block text-xs font-medium text-gray-900">出发城市</label>
-                <p className="mt-1 text-2xs text-gray-600">仅支持北上广深出发</p>
-                <div className="mt-3 grid grid-cols-4 gap-2">
+                <p className="mt-1 text-2xs text-gray-600">上海及江浙沪周边出发</p>
+                <div className="mt-3 grid grid-cols-5 gap-2">
                   {ORIGIN_CITIES.map((c) => {
                     const active = c.code === fromCode;
                     return (
                       <button
                         key={c.code}
                         onClick={() => setFromCode(c.code)}
-                        className={`btn-press rounded-md py-2.5 text-sm font-medium border transition ${
+                        className={`btn-press rounded-md py-2 text-xs font-medium border transition ${
                           active
                             ? "border-gray-900 bg-gray-900 text-white"
                             : "border-gray-200 bg-white text-gray-900 hover:border-gray-400"
@@ -108,9 +145,9 @@ export function SettingsSheet({
                   <label className="block text-xs font-medium text-gray-900">
                     监控金额（含税总价）
                   </label>
-                  {/* 国内 / 东南亚 阈值切换 */}
+                  {/* 国内 / 东南亚 / 日本 / 欧洲 阈值切换 */}
                   <div className="flex items-center gap-0.5 bg-gray-100 rounded-md p-0.5">
-                    {(["domestic", "international"] as const).map((sc) => (
+                    {(["domestic", "international", "japan", "europe"] as const).map((sc) => (
                       <button
                         key={sc}
                         onClick={() => setEditScope(sc)}
@@ -159,7 +196,7 @@ export function SettingsSheet({
                   })}
                 </div>
                 <div className="mt-4 rounded-md bg-gray-100 px-3.5 py-3 text-2xs text-gray-700 leading-relaxed">
-                  含税总价 = 票价 + 机建费（¥50）+ 燃油费。监控 ¥{editingValue} 时，
+                  含税总价 = 票价 + 机建/离境税 + 燃油附加费。监控 ¥{editingValue} 时，
                   会推送 ≤ ¥{ceil} 的机票，留一点抢票缓冲。
                 </div>
               </section>
@@ -170,6 +207,8 @@ export function SettingsSheet({
                     from_code: fromCode,
                     threshold,
                     sea_threshold: seaThreshold,
+                    japan_threshold: japanThreshold,
+                    europe_threshold: europeThreshold,
                   });
                   onClose();
                 }}
