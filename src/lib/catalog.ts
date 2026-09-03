@@ -1,12 +1,12 @@
 /**
  * 出发城市 & 目的地目录 + 价格 / 阈值工具
  *
- * 出发城市：仅北上广深（需求约束）。
+ * 出发城市：上海及江浙沪周边（杭州、无锡、常州、南通）。
  * 目的地：精选热门城市（三字码），覆盖度假 / 美食 / 人文 / 出片等年轻人偏好。
- *        按 scope 分国内（domestic）/ 东南亚（international），下游据此决定 trip_mode。
+ *        按 scope 分国内（domestic）/ 东南亚（international）/ 日本（japan）/ 欧洲（europe），下游据此决定 trip_mode。
  */
 
-/** 出发城市（北上广深） */
+/** 出发城市（上海及江浙沪周边） */
 export interface OriginCity {
   code: string; // 三字码
   name: string; // 短名
@@ -14,20 +14,27 @@ export interface OriginCity {
 }
 
 export const ORIGIN_CITIES: OriginCity[] = [
-  { code: "SZX", name: "深圳", emoji: "🏙️" },
-  { code: "CAN", name: "广州", emoji: "🌉" },
-  { code: "PEK", name: "北京", emoji: "🏛️" },
   { code: "SHA", name: "上海", emoji: "🌃" },
+  { code: "HGH", name: "杭州", emoji: "🍵" },
+  { code: "WUX", name: "无锡", emoji: "🌸" },
+  { code: "CZX", name: "常州", emoji: "🦖" },
+  { code: "NTG", name: "南通", emoji: "🌊" },
 ];
 
-/** 默认出发城市：深圳 */
-export const DEFAULT_ORIGIN_CODE = "SZX";
+/** 默认出发城市：上海 */
+export const DEFAULT_ORIGIN_CODE = "SHA";
 
 /** 默认监控金额（元）— 国内 */
 export const DEFAULT_THRESHOLD = 500;
 
-/** 默认监控金额（元）— 东南亚（含税特价常见区间） */
+/** 默认监控金额（元）— 东南亚 */
 export const DEFAULT_SEA_THRESHOLD = 1200;
+
+/** 默认监控金额（元）— 日本 */
+export const DEFAULT_JAPAN_THRESHOLD = 1500;
+
+/** 默认监控金额（元）— 欧洲 / 土耳其 */
+export const DEFAULT_EUROPE_THRESHOLD = 3800;
 
 /** 推送上限系数：仅推 threshold × 110% 以下（含）的机票 */
 export const PUSH_RATIO = 1.1;
@@ -40,8 +47,8 @@ export function pushCeil(threshold: number): number {
   return Math.round(threshold * PUSH_RATIO);
 }
 
-/** 目的地归属：国内 or 国际（东南亚） */
-export type DestScope = "domestic" | "international";
+/** 目的地归属：国内 / 东南亚 / 日本 / 欧洲（含土耳其） */
+export type DestScope = "domestic" | "international" | "japan" | "europe";
 
 /** 目的地（年轻人向，含一句话理由 + emoji） */
 export interface Destination {
@@ -49,8 +56,8 @@ export interface Destination {
   city: string;
   emoji: string;
   vibe: string; // 一句话理由
-  region: "华北" | "华东" | "华南" | "华中" | "西南" | "西北" | "东北" | "东南亚";
-  scope: DestScope; // 决定调用上游时用 domestic / international
+  region: "华北" | "华东" | "华南" | "华中" | "西南" | "西北" | "东北" | "东南亚" | "东亚" | "欧洲";
+  scope: DestScope; // 决定调用上游时用 domestic / international / japan / europe
 }
 
 export const DESTINATIONS: Destination[] = [
@@ -104,6 +111,31 @@ export const DESTINATIONS: Destination[] = [
   // 🇮🇩 印度尼西亚
   { code: "DPS", city: "巴厘岛", emoji: "🌺", vibe: "神庙梯田·冲浪日落", region: "东南亚", scope: "international" },
   { code: "CGK", city: "雅加达", emoji: "🌆", vibe: "千岛之国门户", region: "东南亚", scope: "international" },
+
+  /* ---------- 🇯🇵 日本主要城市 ---------- */
+  { code: "TYO", city: "东京", emoji: "🗼", vibe: "潮流时尚·银座秋叶原", region: "东亚", scope: "japan" },
+  { code: "OSA", city: "大阪", emoji: "🐙", vibe: "道顿堀美食·环球影城", region: "东亚", scope: "japan" },
+  { code: "FUK", city: "福冈", emoji: "🍜", vibe: "博多拉面·屋台夜市", region: "东亚", scope: "japan" },
+  { code: "CTS", city: "札幌", emoji: "🦀", vibe: "浪漫雪景·帝王蟹温泉", region: "东亚", scope: "japan" },
+  { code: "NGO", city: "名古屋", emoji: "🏯", vibe: "吉卜力公园·鳗鱼三吃", region: "东亚", scope: "japan" },
+  { code: "OKA", city: "冲绳", emoji: "🐬", vibe: "琉球离岛·美丽海水族馆", region: "东亚", scope: "japan" },
+
+  /* ---------- 🇪🇺 欧洲及土耳其主要城市 ---------- */
+  // 🇹🇷 土耳其
+  { code: "IST", city: "伊斯坦布尔", emoji: "🕌", vibe: "横跨欧亚·蓝色清真寺", region: "欧洲", scope: "europe" },
+  // 🇫🇷 法国
+  { code: "PAR", city: "巴黎", emoji: "🥐", vibe: "浪漫之都·卢浮宫铁塔", region: "欧洲", scope: "europe" },
+  // 🇬🇧 英国
+  { code: "LON", city: "伦敦", emoji: "🎡", vibe: "泰晤士河·大英博物馆", region: "欧洲", scope: "europe" },
+  // 🇩🇪 德国
+  { code: "FRA", city: "法兰克福", emoji: "🏰", vibe: "欧洲交通枢纽·莱茵河", region: "欧洲", scope: "europe" },
+  // 🇮🇹 意大利
+  { code: "ROM", city: "罗马", emoji: "🏛️", vibe: "千年古都·斗兽场许愿池", region: "欧洲", scope: "europe" },
+  { code: "MIL", city: "米兰", emoji: "👠", vibe: "时尚之都·米兰大教堂", region: "欧洲", scope: "europe" },
+  // 🇪🇸 西班牙
+  { code: "MAD", city: "马德里", emoji: "💃", vibe: "太阳门广场·普拉多博物馆", region: "欧洲", scope: "europe" },
+  // 🇳🇱 荷兰
+  { code: "AMS", city: "阿姆斯特丹", emoji: "🌷", vibe: "运河风车·梵高博物馆", region: "欧洲", scope: "europe" },
 ];
 
 /** 国内目的地（按 scope 切片） */
@@ -116,7 +148,17 @@ export const SEA_DESTINATIONS: Destination[] = DESTINATIONS.filter(
   (d) => d.scope === "international"
 );
 
-/** 目的地 code -> Destination 查找表（国内 + 国际全量） */
+/** 日本目的地（按 scope 切片） */
+export const JAPAN_DESTINATIONS: Destination[] = DESTINATIONS.filter(
+  (d) => d.scope === "japan"
+);
+
+/** 欧洲及土耳其目的地（按 scope 切片） */
+export const EUROPE_DESTINATIONS: Destination[] = DESTINATIONS.filter(
+  (d) => d.scope === "europe"
+);
+
+/** 目的地 code -> Destination 查找表（全量） */
 export const DESTINATION_MAP: Record<string, Destination> = Object.fromEntries(
   DESTINATIONS.map((d) => [d.code, d])
 );
@@ -133,11 +175,20 @@ export function scopeOf(code: string): DestScope {
 
 /** scope -> 默认阈值 */
 export function defaultThresholdOf(scope: DestScope): number {
-  return scope === "international" ? DEFAULT_SEA_THRESHOLD : DEFAULT_THRESHOLD;
+  switch (scope) {
+    case "international":
+      return DEFAULT_SEA_THRESHOLD;
+    case "japan":
+      return DEFAULT_JAPAN_THRESHOLD;
+    case "europe":
+      return DEFAULT_EUROPE_THRESHOLD;
+    default:
+      return DEFAULT_THRESHOLD;
+  }
 }
 
 /* ------------------------------------------------------------------ */
-/* 价格工具                                                            */
+/* 价格工具                                                           */
 /* ------------------------------------------------------------------ */
 
 /** 计算舱位含税总价（含基建燃油） */
