@@ -52,6 +52,7 @@ interface SubscriptionRow {
   last_alert_at: number | null;
 }
 
+const VALID_SCOPES: DestScope[] = ["domestic", "international", "japan", "europe"];
 
 function rowToSub(r: SubscriptionRow): Subscription {
   const validScopes: DestScope[] = ["domestic", "international", "japan", "europe"];
