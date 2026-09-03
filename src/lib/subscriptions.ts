@@ -121,36 +121,6 @@ export function addSubscription(input: NewSubscription): Subscription {
   };
 }
 
-/** 新增订阅，返回完整记录 */
-export function addSubscription(input: NewSubscription): Subscription {
-  assertServer();
-  const id = `sub_${Date.now().toString(36)}_${Math.random().toString(36).slice(2, 8)}`;
-  const trip_mode = input.trip_mode === "international" ? "international" : "domestic";
-  const sub: SubscriptionRow = {
-    id,
-    from_code: input.from_code,
-    to_code: input.to_code,
-    date_start: input.date_start,
-    date_end: input.date_end,
-    threshold: input.threshold,
-    cabin_class: input.cabin_class ?? "economy",
-    adult: input.adult ?? 1,
-    trip_mode,
-    enabled: 1,
-    created_at: Date.now(),
-    last_alert_total: null,
-    last_alert_at: null,
-  };
-  getDb()
-    .prepare(
-      `INSERT INTO subscriptions
-        (id, from_code, to_code, date_start, date_end, threshold, cabin_class, adult, trip_mode, enabled, created_at)
-       VALUES (@id, @from_code, @to_code, @date_start, @date_end, @threshold, @cabin_class, @adult, @trip_mode, @enabled, @created_at)`
-    )
-    .run(sub);
-  return rowToSub(sub);
-}
-
 /** 删除订阅（连同其告警记录一并清理） */
 export function removeSubscription(id: string): boolean {
   assertServer();
