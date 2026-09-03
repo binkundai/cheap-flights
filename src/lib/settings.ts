@@ -1,39 +1,64 @@
 "use client";
 
 import { useEffect, useState } from "react";
+import {
+  DEFAULT_ORIGIN_CODE,
+  DEFAULT_THRESHOLD,
+  DEFAULT_SEA_THRESHOLD,
+  DEFAULT_JAPAN_THRESHOLD,
+  DEFAULT_EUROPE_THRESHOLD,
+} from "@/lib/catalog";
 
 /**
  * 出发城市 / 阈值设置持久化（localStorage）
  *
- * v2: 区分国内阈值（threshold）与东南亚阈值（sea_threshold），随首页 Tab 独立记忆。
- *     老的 v1 key（cheap-flights:settings:v1）会被读取一次作为兜底迁移，再写入 v2。
+ * v3: 支持国内（threshold）、东南亚（sea_threshold）、日本（japan_threshold）、欧洲（europe_threshold）
+ *     老的 v1/v2 key 会被读取一次作为兜底迁移，再写入 v3。
  */
 export interface UserSettings {
   from_code: string;
   threshold: number; // 国内阈值
   sea_threshold: number; // 东南亚阈值
+  japan_threshold: number; // 日本阈值
+  europe_threshold: number; // 欧洲/土耳其阈值
 }
 
-const KEY = "cheap-flights:settings:v2";
-const LEGACY_KEY = "cheap-flights:settings:v1";
+const KEY = "cheap-flights:settings:v3";
+const LEGACY_V2_KEY = "cheap-flights:settings:v2";
+const LEGACY_V1_KEY = "cheap-flights:settings:v1";
 
-/** 默认值（与 catalog 的默认阈值保持一致） */
+/** 默认值（与 catalog 的默认值保持一致，默认出发地为上海） */
 export const DEFAULT_SETTINGS: UserSettings = {
-  from_code: "SZX",
-  threshold: 500,
-  sea_threshold: 1200,
+  from_code: DEFAULT_ORIGIN_CODE, // "SHA"
+  threshold: DEFAULT_THRESHOLD, // 500
+  sea_threshold: DEFAULT_SEA_THRESHOLD, // 1200
+  japan_threshold: DEFAULT_JAPAN_THRESHOLD, // 1500
+  europe_threshold: DEFAULT_EUROPE_THRESHOLD, // 3800
 };
 
 function migrateLegacy(): Partial<UserSettings> | null {
   if (typeof window === "undefined") return null;
   try {
-    const raw = window.localStorage.getItem(LEGACY_KEY);
-    if (!raw) return null;
-    const p = JSON.parse(raw) as Partial<{ from_code: string; threshold: number }>;
-    const out: Partial<UserSettings> = {};
-    if (p.from_code) out.from_code = p.from_code;
-    if (typeof p.threshold === "number" && p.threshold > 0) out.threshold = p.threshold;
-    return out;
+    // 优先尝试读取 v2
+    const rawV2 = window.localStorage.getItem(LEGACY_V2_KEY);
+    if (rawV2) {
+      const p2 = JSON.parse(rawV2) as Partial<UserSettings>;
+      return {
+        from_code: p2.from_code,
+        threshold: p2.threshold,
+        sea_threshold: p2.sea_threshold,
+      };
+    }
+    // 其次尝试读取 v1
+    const rawV1 = window.localStorage.getItem(LEGACY_V1_KEY);
+    if (rawV1) {
+      const p1 = JSON.parse(rawV1) as Partial<{ from_code: string; threshold: number }>;
+      return {
+        from_code: p1.from_code,
+        threshold: p1.threshold,
+      };
+    }
+    return null;
   } catch {
     return null;
   }
@@ -44,10 +69,12 @@ export function loadSettings(fallback: UserSettings): UserSettings {
   try {
     const raw = window.localStorage.getItem(KEY);
     const p = raw ? (JSON.parse(raw) as Partial<UserSettings>) : null;
-    // 老 v1 用户：把 from_code / threshold 迁移过来
+    
+    // 如果没有 v3 数据，则尝试从老版本迁移
     const legacy = p ? null : migrateLegacy();
     const src = { ...(legacy ?? {}) };
     if (p) Object.assign(src, p);
+
     return {
       from_code: src.from_code || fallback.from_code,
       threshold:
@@ -58,6 +85,14 @@ export function loadSettings(fallback: UserSettings): UserSettings {
         typeof src.sea_threshold === "number" && src.sea_threshold > 0
           ? src.sea_threshold
           : fallback.sea_threshold,
+      japan_threshold:
+        typeof src.japan_threshold === "number" && src.japan_threshold > 0
+          ? src.japan_threshold
+          : fallback.japan_threshold,
+      europe_threshold:
+        typeof src.europe_threshold === "number" && src.europe_threshold > 0
+          ? src.europe_threshold
+          : fallback.europe_threshold,
     };
   } catch {
     return fallback;
