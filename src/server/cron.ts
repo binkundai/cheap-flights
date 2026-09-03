@@ -33,14 +33,14 @@ export async function runMonitor(): Promise<MonitorStats> {
   for (const sub of subs) {
     stats.scanned++;
     try {
-      const { best } = await scanSubscription(
-        sub.from_code,
-        sub.to_code,
-        sub.date_start,
-        sub.date_end,
-        sub.threshold,
-        { cabin_class: sub.cabin_class, adult: sub.adult, trip_mode: sub.trip_mode }
-      );
+const { best } = await scanSubscription(
+  sub.from_code,
+  sub.to_code,
+  sub.date_start,
+  sub.date_end,
+  sub.threshold,
+  { cabin_class: sub.cabin_class, adult: sub.adult, trip_mode: sub.trip_mode }
+);
 
       if (!best || best.total > sub.threshold) continue; // 未命中
 
