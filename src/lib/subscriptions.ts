@@ -7,6 +7,9 @@
  * 与 orders.ts 不同，订阅存服务端 SQLite（cron 读得到），
  * 不放 localStorage（浏览器关闭后 cron 拿不到）。
  */
+
+import { DestScope } from "@/lib/catalog";  // 顶部加这行 import
+
 import { getDb } from "@/server/db";
 
 function assertServer() {
@@ -15,17 +18,18 @@ function assertServer() {
   }
 }
 
+
 export interface Subscription {
   id: string;
   from_code: string;
   to_code: string;
-  date_start: string; // YYYY-MM-DD
-  date_end: string; // YYYY-MM-DD
+  date_start: string;
+  date_end: string;
   threshold: number;
   cabin_class: string;
   adult: number;
-  /** 国内 / 国际（决定 cron 扫描时传给上游的 trip_mode） */
-  trip_mode: "domestic" | "international";
+  /** 业务 scope：国内 / 东南亚 / 日本 / 欧洲（决定默认阈值、UI 分组；调用上游前需再映射成 domestic/international） */
+  trip_mode: DestScope;   // ← 从 "domestic" | "international" 改成 DestScope
   enabled: boolean;
   created_at: number;
   last_alert_total: number | null;
@@ -48,10 +52,14 @@ interface SubscriptionRow {
   last_alert_at: number | null;
 }
 
+
 function rowToSub(r: SubscriptionRow): Subscription {
+  const validScopes: DestScope[] = ["domestic", "international", "japan", "europe"];
   return {
     ...r,
-    trip_mode: r.trip_mode === "international" ? "international" : "domestic",
+    trip_mode: validScopes.includes(r.trip_mode as DestScope)
+      ? (r.trip_mode as DestScope)
+      : "domestic",
     enabled: !!r.enabled,
     last_alert_total: r.last_alert_total,
     last_alert_at: r.last_alert_at,
@@ -76,6 +84,7 @@ export function listEnabledSubscriptions(): Subscription[] {
   return rows.map(rowToSub);
 }
 
+
 export interface NewSubscription {
   from_code: string;
   to_code: string;
@@ -84,8 +93,32 @@ export interface NewSubscription {
   threshold: number;
   cabin_class?: string;
   adult?: number;
-  /** 国内 / 国际（默认 domestic） */
-  trip_mode?: "domestic" | "international";
+  /** 业务 scope（默认 domestic） */
+  trip_mode?: DestScope;   // ← 同样改成 DestScope
+}
+
+export function addSubscription(input: NewSubscription): Subscription {
+  assertServer();
+  const id = `sub_${Date.now().toString(36)}_${Math.random().toString(36).slice(2, 8)}`;
+  const validScopes: DestScope[] = ["domestic", "international", "japan", "europe"];
+  const trip_mode: DestScope = validScopes.includes(input.trip_mode as DestScope)
+    ? (input.trip_mode as DestScope)
+    : "domestic";
+  const sub: SubscriptionRow = {
+    id,
+    from_code: input.from_code,
+    to_code: input.to_code,
+    date_start: input.date_start,
+    date_end: input.date_end,
+    threshold: input.threshold,
+    cabin_class: input.cabin_class ?? "economy",
+    adult: input.adult ?? 1,
+    trip_mode,
+    enabled: 1,
+    created_at: Date.now(),
+    last_alert_total: null,
+    last_alert_at: null,
+  };
 }
 
 /** 新增订阅，返回完整记录 */
