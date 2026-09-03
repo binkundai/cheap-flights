@@ -10,7 +10,7 @@
  */
 import { listEnabledSubscriptions, recordAlert, updateLastAlert } from "@/lib/subscriptions";
 import { markPushed } from "@/lib/alerts";
-import { ORIGIN_MAP, DESTINATION_MAP } from "@/lib/catalog";
+import { ORIGIN_MAP, DESTINATION_MAP, toApiTripMode } from "@/lib/catalog";
 import { scanSubscription } from "@/lib/scan-engine";
 import { pushDealAlert, barkConfigured } from "@/server/bark";
 
@@ -39,7 +39,11 @@ const { best } = await scanSubscription(
   sub.date_start,
   sub.date_end,
   sub.threshold,
-  { cabin_class: sub.cabin_class, adult: sub.adult, trip_mode: sub.trip_mode }
+  {
+    cabin_class: sub.cabin_class,
+    adult: sub.adult,
+    trip_mode: toApiTripMode(sub.trip_mode), // ← 4 值 scope 映射成上游 2 值 trip_mode
+  }
 );
 
       if (!best || best.total > sub.threshold) continue; // 未命中
