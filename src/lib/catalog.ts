@@ -226,3 +226,8 @@ export function hm(timeStr: string): string {
   const m = /(\d{2}:\d{2})/.exec(timeStr);
   return m ? m[1] : timeStr;
 }
+
+/** 业务 scope -> 上游龙虾出行 API 的 trip_mode（上游只区分国内/国际，日本/欧洲一律按国际处理） */
+export function toApiTripMode(scope: DestScope): "domestic" | "international" {
+  return scope === "domestic" ? "domestic" : "international";
+}
